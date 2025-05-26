@@ -1,0 +1,521 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Interactive Guide: EDF, PMSM & FOC Modeling in OpenModelica</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.0/dist/katex.min.css" xintegrity="sha384-Xi8rHCmBmhbuyyhbI88391ZKP2dmfnOl4rT9ZfRI7mLTdk1wblIUnrIq35nqwEvC" crossorigin="anonymous">
+    <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.0/dist/katex.min.js" xintegrity="sha384-X/XCfMm41VSsqRNwNEGruntzFStCAmbHnHN9CoHR益+27HrRreq7wa2bR41Vbr" crossorigin="anonymous"></script>
+    <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.0/dist/contrib/auto-render.min.js" xintegrity="sha384-+XBljXPPiv+OzfbB3cVmLHf4hdUFHlWNZN5spNQ7rmHTXpd7WvJum6fIACpNNfIR" crossorigin="anonymous"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@3.7.0/dist/chart.min.js"></script>
+    <!-- Visualization & Content Choices:
+        - Formulas (LaTeX/KaTeX): Inform/Reference, hover for details.
+        - PMSM Params: Interactive list (HTML/JS), click for description.
+        - FOC Components: Interactive block diagram (HTML/CSS/JS), click for details.
+        - MSL Blocks: Categorized lists (HTML/JS), click to expand.
+        - Step-by-Step: Accordions with pseudo-code (HTML/JS), copy buttons.
+        - EDF Characteristics (Torque-Speed, Power-Speed): Illustrative Line Charts (Chart.js with generated data) to visually represent the concepts.
+        - Example PI Controller Response: Illustrative Line Chart (Chart.js with generated data) for $i_d$/$i_q$ tracking.
+        - Justification: Enhance understanding of concepts and processes through interaction and visual aids where appropriate, making technical content more engaging. No SVG/Mermaid.
+    -->
+    <style>
+        body { font-family: 'Inter', sans-serif; }
+        .katex-display > .katex { text-align: left !important; }
+        .tab-button { transition: all 0.3s ease; }
+        .tab-button.active { border-bottom-width: 4px; }
+        .content-section { display: none; }
+        .content-section.active { display: block; }
+        .accordion-content { max-height: 0; overflow: hidden; transition: max-height 0.3s ease-out; }
+        .accordion-button.open + .accordion-content { max-height: 2000px; } /* Adjust as needed */
+        .foc-block { border: 2px solid; padding: 10px; text-align: center; margin: 5px; cursor: pointer; }
+        .foc-arrow { position: relative; text-align: center; margin: 5px 0; }
+        .foc-arrow::after { content: '➔'; font-size: 24px; }
+        .code-block { background-color: #f0f0f0; border: 1px solid #ccc; padding: 10px; border-radius: 5px; margin-top: 5px; position: relative; font-family: monospace; white-space: pre-wrap; }
+        .copy-button { position: absolute; top: 5px; right: 5px; background-color: #ddd; border: none; padding: 3px 6px; border-radius: 3px; cursor: pointer; font-size: 0.8em; }
+        .tooltip { position: relative; display: inline-block; cursor: help; }
+        .tooltip .tooltiptext { visibility: hidden; width: 200px; background-color: #555; color: #fff; text-align: center; border-radius: 6px; padding: 5px 0; position: absolute; z-index: 1; bottom: 125%; left: 50%; margin-left: -100px; opacity: 0; transition: opacity 0.3s; font-size: 0.9em; }
+        .tooltip:hover .tooltiptext { visibility: visible; opacity: 1; }
+        .chart-container { position: relative; width: 100%; max-width: 600px; margin-left: auto; margin-right: auto; height: 300px; max-height: 400px; }
+        @media (min-width: 768px) { .chart-container { height: 350px; } }
+        h1, h2, h3 { font-weight: 600; }
+        h1 { font-size: 2.25rem; line-height: 2.5rem; } /* text-4xl */
+        h2 { font-size: 1.875rem; line-height: 2.25rem; } /* text-3xl */
+        h3 { font-size: 1.5rem; line-height: 2rem; } /* text-2xl */
+        h4 { font-size: 1.25rem; line-height: 1.75rem; } /* text-xl */
+    </style>
+</head>
+<body class="bg-amber-50 text-neutral-800">
+
+    <div class="container mx-auto p-4 sm:p-6 md:p-8">
+        <header class="mb-8 text-center">
+            <h1 class="text-orange-700">Interactive Guide: EDF, PMSM & FOC Modeling</h1>
+            <p class="text-lg text-neutral-600 mt-2">An interactive exploration of the guide for OpenModelica users.</p>
+        </header>
+
+        <nav class="mb-8 flex flex-wrap justify-center border-b-2 border-amber-300">
+            <button class="tab-button text-lg py-3 px-4 sm:px-6 border-amber-500 text-amber-700 hover:bg-amber-100 active" data-tab="overview">Overview & Concepts</button>
+            <button class="tab-button text-lg py-3 px-4 sm:px-6 border-amber-500 text-amber-700 hover:bg-amber-100" data-tab="modeling">Modeling in OpenModelica</button>
+            <button class="tab-button text-lg py-3 px-4 sm:px-6 border-amber-500 text-amber-700 hover:bg-amber-100" data-tab="guide">Step-by-Step Guide</button>
+            <button class="tab-button text-lg py-3 px-4 sm:px-6 border-amber-500 text-amber-700 hover:bg-amber-100" data-tab="practices">Best Practices & Resources</button>
+        </nav>
+
+        <main>
+            <section id="overview" class="content-section active space-y-6">
+                <h2 class="text-orange-600 border-b pb-2">Overview & Concepts</h2>
+                <p>This section introduces the fundamental components of the system: the Electric Ducted Fan (EDF), the 3-Phase Permanent Magnet Synchronous Motor (PMSM), and the Field-Oriented Control (FOC) strategy. Understanding these basics is crucial before diving into modeling.</p>
+
+                <div>
+                    <h3 class="text-orange-600 mb-2">1.1 Electric Ducted Fan (EDF)</h3>
+                    <p>An EDF is a propulsion unit where a fan is mounted within a cylindrical shroud, improving thrust efficiency. Key characteristics include:</p>
+                    <ul class="list-disc list-inside ml-4 my-2 space-y-1">
+                        <li><strong>Thrust-Speed:</strong> Thrust typically increases with rotational speed.</li>
+                        <li><strong>Power-Speed:</strong> Power consumed ($P_{edf}$) increases significantly with speed (often $P_{edf} \propto \omega^3$).</li>
+                        <li><strong>Torque-Speed:</strong> The load torque ($T_L$) generally increases with the square of the rotational speed.</li>
+                    </ul>
+                    <p>A simplified load model is often used: $T_L = k_L \cdot \omega^2$</p>
+                    <p>Explore the typical EDF characteristics with the interactive chart below. Adjust the hypothetical load constant $k_L$ to see its effect on the torque-speed curve, and a similar constant for the power-speed curve.</p>
+                    <div class="my-4 p-4 border rounded-lg bg-white shadow">
+                        <label for="kl_constant" class="block text-sm font-medium text-neutral-700">EDF Load Constant $k_L$ (for Torque):</label>
+                        <input type="number" id="kl_constant" value="0.0001" step="0.00001" class="mt-1 block w-full p-2 border border-neutral-300 rounded-md shadow-sm focus:ring-orange-500 focus:border-orange-500 sm:text-sm">
+                         <label for="kp_constant" class="block text-sm font-medium text-neutral-700 mt-2">EDF Power Constant $k_P$ (for Power):</label>
+                        <input type="number" id="kp_constant" value="0.000005" step="0.000001" class="mt-1 block w-full p-2 border border-neutral-300 rounded-md shadow-sm focus:ring-orange-500 focus:border-orange-500 sm:text-sm">
+                        <div class="chart-container mt-4">
+                            <canvas id="edfChart"></canvas>
+                        </div>
+                    </div>
+                </div>
+
+                <div>
+                    <h3 class="text-orange-600 mb-2">1.2 3-Phase Permanent Magnet Synchronous Motor (PMSM)</h3>
+                    <p>PMSMs are modeled in the d-q rotor reference frame. Click on parameters for details.</p>
+                    <p>Voltage Equations:</p>
+                    <div class="my-2 p-2 bg-amber-100 rounded">
+                        $v_d = R_s i_d + L_d \frac{di_d}{dt} - \omega_e L_q i_q$ <br>
+                        $v_q = R_s i_q + L_q \frac{di_q}{dt} + \omega_e L_d i_d + \omega_e \lambda_{pm}$
+                    </div>
+                    <p>Electromagnetic Torque:</p>
+                    <div class="my-2 p-2 bg-amber-100 rounded">
+                        $T_e = \frac{3}{2} P \left( \lambda_{pm} i_q + (L_d - L_q) i_d i_q \right)$
+                    </div>
+                    <p>Key Parameters:</p>
+                    <ul class="list-disc list-inside ml-4 my-2 space-y-1">
+                        <li><span class="tooltip">$R_s$<span class="tooltiptext">Stator resistance per phase.</span></span>: Stator Resistance</li>
+                        <li><span class="tooltip">$L_d, L_q$<span class="tooltiptext">d-axis and q-axis stator inductances. For Surface PMSM (SPMSM), $L_d \approx L_q$. For Interior PMSM (IPMSM), $L_q > L_d$.</span></span>: Stator Inductances</li>
+                        <li><span class="tooltip">$\omega_e$<span class="tooltiptext">Electrical angular velocity ($\omega_e = P \cdot \omega_m$).</span></span>: Electrical Angular Velocity</li>
+                        <li><span class="tooltip">$\lambda_{pm}$<span class="tooltiptext">Flux linkage established by the permanent magnets.</span></span>: Permanent Magnet Flux Linkage</li>
+                        <li><span class="tooltip">$P$<span class="tooltiptext">Number of pole pairs of the motor.</span></span>: Number of Pole Pairs</li>
+                        <li><span class="tooltip">$J_m$<span class="tooltiptext">Moment of inertia of the motor rotor.</span></span>: Motor Inertia</li>
+                    </ul>
+                </div>
+
+                <div>
+                    <h3 class="text-orange-600 mb-2">1.3 Field-Oriented Control (FOC)</h3>
+                    <p>FOC independently controls motor torque and flux. Click blocks in the diagram for details.</p>
+                    <div id="focDiagramContainer" class="my-4 p-4 border rounded-lg bg-white shadow text-sm">
+                        <div class="flex flex-col items-center">
+                            <div class="foc-block border-orange-500 text-orange-700" data-foc="current_sense">Current Sensing ($i_a, i_b, i_c$)</div>
+                            <div class="foc-arrow text-orange-500"></div>
+                            <div class="foc-block border-orange-500 text-orange-700" data-foc="clarke">Clarke Transform ($i_\alpha, i_\beta$)</div>
+                            <div class="foc-arrow text-orange-500"></div>
+                            <div class="foc-block border-orange-500 text-orange-700" data-foc="park">Park Transform ($i_d, i_q$) (uses $\theta_e$)</div>
+                            <div class="foc-arrow text-orange-500"></div>
+                            <div class="grid grid-cols-2 gap-4">
+                                <div class="foc-block border-green-500 text-green-700" data-foc="pi_d">PI Controller ($i_d$) $\rightarrow v_{d,ref}$</div>
+                                <div class="foc-block border-green-500 text-green-700" data-foc="pi_q">PI Controller ($i_q$) $\rightarrow v_{q,ref}$</div>
+                            </div>
+                            <div class="foc-arrow text-green-500"></div>
+                            <div class="foc-block border-blue-500 text-blue-700" data-foc="inv_park">Inverse Park Transform ($v_{\alpha,ref}, v_{\beta,ref}$) (uses $\theta_e$)</div>
+                            <div class="foc-arrow text-blue-500"></div>
+                            <div class="foc-block border-blue-500 text-blue-700" data-foc="pwm">SVPWM/SPWM $\rightarrow$ Inverter Gates</div>
+                        </div>
+                        <div id="focBlockDetail" class="mt-4 p-3 bg-amber-100 rounded-md min-h-[50px]">Select a block to see details.</div>
+                    </div>
+                    <p>Below is an illustrative chart showing typical PI controller performance for current tracking (e.g., $i_q$ tracking $i_{q,ref}$).</p>
+                    <div class="chart-container mt-4">
+                        <canvas id="piChart"></canvas>
+                    </div>
+                </div>
+            </section>
+
+            <section id="modeling" class="content-section space-y-6">
+                <h2 class="text-orange-600 border-b pb-2">Modeling in OpenModelica</h2>
+                <p>This section outlines the strategy for modeling the EDF system in OpenModelica, focusing on leveraging the Modelica Standard Library (MSL) and understanding the overall system architecture within the simulation environment.</p>
+
+                <div>
+                    <h3 class="text-orange-600 mb-2">2.1 Leveraging the Modelica Standard Library (MSL)</h3>
+                    <p>The MSL provides many pre-built components. Click to expand categories:</p>
+                    <div class="space-y-2">
+                        <button class="accordion-button bg-amber-200 text-amber-800 p-3 rounded-md w-full text-left hover:bg-amber-300">Modelica.Electrical.Machines</button>
+                        <div class="accordion-content p-3 bg-white border rounded-md">
+                            Contains PMSM models (e.g., `BasicMachines.Components.PermanentMagnet`). These have electrical connectors and a mechanical flange.
+                        </div>
+                        <button class="accordion-button bg-amber-200 text-amber-800 p-3 rounded-md w-full text-left hover:bg-amber-300">Modelica.Blocks</button>
+                        <div class="accordion-content p-3 bg-white border rounded-md">
+                            `Continuous` (PI controllers), `Math` (sum, gain, trig), `Math.Transformations` (potential Clarke/Park), `Sources` (references).
+                        </div>
+                        <button class="accordion-button bg-amber-200 text-amber-800 p-3 rounded-md w-full text-left hover:bg-amber-300">Modelica.Mechanics.Rotational</button>
+                        <div class="accordion-content p-3 bg-white border rounded-md">
+                            `Sources.QuadraticSpeedDependentTorque` (for EDF load $T_L = k \omega^2$), `Components.Inertia`.
+                        </div>
+                        <button class="accordion-button bg-amber-200 text-amber-800 p-3 rounded-md w-full text-left hover:bg-amber-300">Modelica.Electrical.Analog</button>
+                        <div class="accordion-content p-3 bg-white border rounded-md">
+                            Basic electrical components, `Sources` (voltage/current sources).
+                        </div>
+                    </div>
+                </div>
+
+                <div>
+                    <h3 class="text-orange-600 mb-2">2.2 Custom Model Components (If Needed)</h3>
+                     <ul class="list-disc list-inside ml-4 my-2 space-y-1">
+                        <li><strong>EDF Load Model:</strong> If a more complex aerodynamic model is required.</li>
+                        <li><strong>Transform Blocks:</strong> For specific Clarke/Park formulations if not readily available.</li>
+                        <li><strong>SVPWM Modulator:</strong> For detailed inverter studies; often an average model is used.</li>
+                    </ul>
+                </div>
+                <div>
+                    <h3 class="text-orange-600 mb-2">2.3 Overall System Architecture</h3>
+                    <p>The OpenModelica model will conceptually connect these parts:</p>
+                    <ol class="list-decimal list-inside ml-4 my-2 space-y-1">
+                        <li>Reference Generation (Torque/Speed commands)</li>
+                        <li>FOC Controller Block</li>
+                        <li>(Optional) Inverter Model</li>
+                        <li>PMSM Model</li>
+                        <li>EDF Load Model</li>
+                        <li>Sensor Models (Current, Position/Speed)</li>
+                    </ol>
+                    <p>Imagine these blocks connected in a loop: References feed the FOC, FOC drives the Inverter/PMSM, PMSM drives the Load, and Sensors provide feedback from the PMSM to the FOC.</p>
+                </div>
+            </section>
+
+            <section id="guide" class="content-section space-y-6">
+                <h2 class="text-orange-600 border-b pb-2">Step-by-Step Implementation Guide</h2>
+                <p>Follow these steps to build your EDF-PMSM-FOC model in OMEdit. Each step includes key actions and considerations. Click on each step to expand its details.</p>
+
+                <div class="space-y-3">
+                    <button class="accordion-button bg-amber-200 text-amber-800 p-3 rounded-md w-full text-left hover:bg-amber-300">Step 1: Model the PMSM</button>
+                    <div class="accordion-content p-3 bg-white border rounded-md">
+                        <p>1. <strong>Choose Model:</strong> From `Modelica.Electrical.Machines...PMsynchronous`, select `SMPM1` or similar.</p>
+                        <p>2. <strong>Parameterize:</strong> Set $R_s, L_d, L_q, \lambda_{pm} (\text{PsiPM}), p, J$. Connect electrical ground and note mechanical flange.</p>
+                    </div>
+
+                    <button class="accordion-button bg-amber-200 text-amber-800 p-3 rounded-md w-full text-left hover:bg-amber-300">Step 2: Implement the FOC Controller (Hierarchical Block)</button>
+                    <div class="accordion-content p-3 bg-white border rounded-md space-y-2">
+                        <p>Inputs: `I_abc_measured`, `theta_e_measured`, `Iq_ref`, `Id_ref`.</p>
+                        <p>Outputs: $v_{\alpha,ref}, v_{\beta,ref}$ or $v_{a,ref}, v_{b,ref}, v_{c,ref}$.</p>
+                        <p>Internal components (use `Modelica.Blocks`):</p>
+                        <div><strong>2a. Clarke Transform:</strong> Input $i_a, i_b, (i_c)$. Output $i_\alpha, i_\beta$.
+                            <div class="code-block" data-code="Real ialpha = ia;\nReal ibeta = (ia + 2*ib) / sqrt(3.0);">Real ialpha = ia;<br>Real ibeta = (ia + 2*ib) / sqrt(3.0);</div>
+                        </div>
+                        <div><strong>2b. Park Transform:</strong> Input $i_\alpha, i_\beta, \theta_e$. Output $i_d, i_q$.
+                            <div class="code-block" data-code="Real id_measured = ialpha * cos(theta_e) + ibeta * sin(theta_e);\nReal iq_measured = -ialpha * sin(theta_e) + ibeta * cos(theta_e);">Real id_measured = ialpha * cos(theta_e) + ibeta * sin(theta_e);<br>Real iq_measured = -ialpha * sin(theta_e) + ibeta * cos(theta_e);</div>
+                        </div>
+                        <p><strong>2c. Current PI Controllers:</strong> For $i_d$ and $i_q$. Tune Kp, Ti. Input errors $e_d = I_{d,ref} - i_{d,measured}$, $e_q = I_{q,ref} - i_{q,measured}$. Outputs $v_{d,ref\_raw}, v_{q,ref\_raw}$.</p>
+                        <div><strong>2d. Decoupling (Recommended):</strong>
+                            <div class="code-block" data-code="vd_ref = vd_ref_raw - omega_e * Lq * iq_measured;\nvq_ref = vq_ref_raw + omega_e * Ld * id_measured + omega_e * PsiPM;">$v_{d,ref} = v_{d,ref\_raw} - \omega_e L_q i_{q,measured}$ <br> $v_{q,ref} = v_{q,ref\_raw} + \omega_e L_d i_{d,measured} + \omega_e \lambda_{pm}$</div>
+                            (Requires $\omega_e$ feedback)
+                        </div>
+                        <div><strong>2e. Inverse Park Transform:</strong> Input $v_{d,ref}, v_{q,ref}, \theta_e$. Output $v_{\alpha,ref}, v_{\beta,ref}$.
+                            <div class="code-block" data-code="Real valpha_ref = vd_ref * cos(theta_e) - vq_ref * sin(theta_e);\nReal vbeta_ref  = vd_ref * sin(theta_e) + vq_ref * cos(theta_e);">Real valpha_ref = vd_ref * cos(theta_e) - vq_ref * sin(theta_e);<br>Real vbeta_ref  = vd_ref * sin(theta_e) + vq_ref * cos(theta_e);</div>
+                        </div>
+                        <p><strong>2f. Voltage Limitation (Saturation):</strong> Limit $v_{\alpha,ref}, v_{\beta,ref}$ based on DC bus voltage.</p>
+                        <p><strong>2g. (Optional) Inverse Clarke:</strong> If $v_{a,b,c}$ outputs needed.</p>
+                    </div>
+
+                    <button class="accordion-button bg-amber-200 text-amber-800 p-3 rounded-md w-full text-left hover:bg-amber-300">Step 3: Model the EDF Load</button>
+                    <div class="accordion-content p-3 bg-white border rounded-md">
+                        <p>1. <strong>Using MSL:</strong> `Modelica.Mechanics.Rotational.Sources.QuadraticSpeedDependentTorque`. Connect its `flange_b` to PMSM's `flange_a`. Set `k` parameter ($T_L = k \cdot \text{sign}(\omega) \cdot \omega^2$).</p>
+                        <p>2. <strong>Inertia:</strong> Lump EDF inertia with motor's $J$ or add separate `Inertia` block.</p>
+                    </div>
+                    <button class="accordion-button bg-amber-200 text-amber-800 p-3 rounded-md w-full text-left hover:bg-amber-300">Step 4: Integrate and Connect Components</button>
+                    <div class="accordion-content p-3 bg-white border rounded-md">
+                        <p>1. <strong>Reference Signals:</strong> Use `Modelica.Blocks.Sources` for $I_{q,ref}$ and $I_{d,ref}$.</p>
+                        <p>2. <strong>Motor Connections:</strong> PMSM phase connectors to `SignalVoltage` sources controlled by FOC outputs. Handle neutral point.</p>
+                        <p>3. <strong>FOC Connections:</strong>
+                            <ul class="list-disc list-inside ml-4">
+                                <li>Current Feedback: PMSM phase currents (e.g., `motor.phase_a.i`) to FOC.</li>
+                                <li>Position/Speed Feedback: $\theta_e = P \cdot \text{motor.phi}$, $\omega_e = P \cdot \text{motor.w}$. Use `Gain` block.</li>
+                            </ul>
+                        </p>
+                        <p>4. <strong>Mechanical Connection:</strong> `PMSM.flange_a` to `EDFLoad.flange_b`.</p>
+                    </div>
+                     <button class="accordion-button bg-amber-200 text-amber-800 p-3 rounded-md w-full text-left hover:bg-amber-300">Step 5: Simulation and Analysis</button>
+                    <div class="accordion-content p-3 bg-white border rounded-md">
+                        <p>1. <strong>Set up Experiment:</strong> Start/stop times, solver (`dassl`, `ida`).</p>
+                        <p>2. <strong>Plot Variables:</strong> $i_d, i_q, i_{abc}$, $v_d, v_q, v_{abc}$, $\omega_m, T_e, T_L, \theta_e$.</p>
+                        <p>3. <strong>Analyze Performance:</strong> Current tracking, speed stability, phase current balance.</p>
+                    </div>
+                </div>
+            </section>
+
+            <section id="practices" class="content-section space-y-6">
+                <h2 class="text-orange-600 border-b pb-2">Best Practices & Resources</h2>
+                <p>Key considerations for successful modeling and simulation, along with a quick reference for important formulas.</p>
+                <div>
+                    <h3 class="text-orange-600 mb-2">4.1 Important Considerations</h3>
+                    <ul class="list-disc list-inside ml-4 my-2 space-y-1">
+                        <li><strong>Parameterization:</strong> Accurate PMSM and EDF load parameters are crucial.</li>
+                        <li><strong>Units:</strong> Ensure consistency; Modelica is strict.</li>
+                        <li><strong>Initialization:</strong> Pay attention to initial conditions to avoid transients.</li>
+                        <li><strong>Numerical Issues:</strong> Systems can be stiff; adjust solver or tolerance.</li>
+                        <li><strong>Modularity:</strong> Build reusable blocks for FOC, PMSM, Load.</li>
+                        <li><strong>Verification:</strong> Test parts individually, then integrate. Simulate open-loop PMSM first.</li>
+                        <li><strong>PI Controller Tuning:</strong> Essential for FOC performance. Current loop bandwidth > speed loop.</li>
+                        <li><strong>SVPWM Detail:</strong> Average inverter model is an idealization. Detailed model for higher fidelity.</li>
+                    </ul>
+                </div>
+                <div>
+                    <h3 class="text-orange-600 mb-2">4.2 Key Formulas Quick Reference</h3>
+                    <div class="space-y-3">
+                        <div><strong>EDF Load:</strong> $T_L = k_L \cdot \omega^2$</div>
+                        <div><strong>PMSM Voltages (d-q):</strong><br>
+                            $v_d = R_s i_d + L_d \frac{di_d}{dt} - \omega_e L_q i_q$<br>
+                            $v_q = R_s i_q + L_q \frac{di_q}{dt} + \omega_e L_d i_d + \omega_e \lambda_{pm}$
+                        </div>
+                        <div><strong>PMSM Torque:</strong> $T_e = \frac{3}{2} P ( \lambda_{pm} i_q + (L_d - L_q) i_d i_q )$</div>
+                        <div><strong>Clarke Transform:</strong><br>
+                            $i_\alpha = i_a$<br>
+                            $i_\beta = \frac{1}{\sqrt{3}} (i_a + 2i_b)$
+                        </div>
+                        <div><strong>Park Transform:</strong><br>
+                            $i_d = i_\alpha \cos(\theta_e) + i_\beta \sin(\theta_e)$<br>
+                            $i_q = -i_\alpha \sin(\theta_e) + i_\beta \cos(\theta_e)$
+                        </div>
+                        <div><strong>Inverse Park Transform:</strong><br>
+                            $v_{\alpha,ref} = v_{d,ref} \cos(\theta_e) - v_{q,ref} \sin(\theta_e)$<br>
+                            $v_{\beta,ref} = v_{d,ref} \sin(\theta_e) + v_{q,ref} \cos(\theta_e)$
+                        </div>
+                    </div>
+                </div>
+                 <div>
+                    <h3 class="text-orange-600 mb-2">Conclusion from Original Guide</h3>
+                    <p>Modeling an EDF with a PMSM and FOC in OpenModelica is a rewarding project that provides deep insights into electric drive systems. By systematically building and testing each component, leveraging the Modelica Standard Library, and carefully parameterizing your models, you can create a powerful simulation tool for studying FOC algorithms and system behavior. Start simple, verify each step, and gradually increase complexity.</p>
+                </div>
+            </section>
+        </main>
+
+        <footer class="mt-12 pt-6 border-t border-amber-300 text-center text-neutral-500 text-sm">
+            <p>Interactive guide generated based on the OpenModelica EDF/PMSM/FOC modeling guide.</p>
+            <p>&copy; 2025 JFOX Aircraft Co., Ltd.</p>
+        </footer>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', function () {
+            // KaTeX auto-rendering
+            renderMathInElement(document.body, {
+                delimiters: [
+                    {left: "$$", right: "$$", display: true},
+                    {left: "$", right: "$", display: false},
+                    {left: "\\(", right: "\\)", display: false},
+                    {left: "\\[", right: "\\]", display: true}
+                ]
+            });
+
+            // Tab functionality
+            const tabButtons = document.querySelectorAll('.tab-button');
+            const contentSections = document.querySelectorAll('.content-section');
+
+            tabButtons.forEach(button => {
+                button.addEventListener('click', () => {
+                    tabButtons.forEach(btn => btn.classList.remove('active', 'bg-amber-100'));
+                    button.classList.add('active', 'bg-amber-100');
+                    
+                    contentSections.forEach(section => section.classList.remove('active'));
+                    document.getElementById(button.dataset.tab).classList.add('active');
+                });
+            });
+
+            // Accordion functionality
+            const accordionButtons = document.querySelectorAll('.accordion-button');
+            accordionButtons.forEach(button => {
+                button.addEventListener('click', () => {
+                    button.classList.toggle('open');
+                    // const content = button.nextElementSibling;
+                    // if (content.style.maxHeight) {
+                    //     content.style.maxHeight = null;
+                    // } else {
+                    //     content.style.maxHeight = content.scrollHeight + "px";
+                    // }
+                });
+            });
+            
+            // Code block copy functionality
+            document.querySelectorAll('.code-block').forEach(block => {
+                const copyButton = document.createElement('button');
+                copyButton.textContent = 'Copy';
+                copyButton.className = 'copy-button bg-orange-400 hover:bg-orange-500 text-white';
+                copyButton.onclick = () => {
+                    const codeToCopy = block.dataset.code || block.innerText;
+                    navigator.clipboard.writeText(codeToCopy).then(() => {
+                        copyButton.textContent = 'Copied!';
+                        setTimeout(() => { copyButton.textContent = 'Copy'; }, 2000);
+                    }).catch(err => console.error('Failed to copy: ', err));
+                };
+                block.appendChild(copyButton);
+            });
+
+            // FOC Diagram Interactivity
+            const focBlocks = document.querySelectorAll('.foc-block');
+            const focDetailDiv = document.getElementById('focBlockDetail');
+            const focDetails = {
+                current_sense: "<strong>Current Sensing:</strong> Measures two or three phase currents ($i_a, i_b, i_c$) from the motor.",
+                clarke: "<strong>Clarke Transform:</strong> Converts three-phase currents ($i_a, i_b, i_c$) into two-phase orthogonal stationary currents ($i_\\alpha, i_\\beta$).<br>$i_\\alpha = i_a$<br>$i_\\beta = \\frac{1}{\\sqrt{3}} (i_a + 2i_b)$",
+                park: "<strong>Park Transform:</strong> Converts stationary ($i_\\alpha, i_\\beta$) to rotating ($i_d, i_q$) currents using rotor electrical angle $\\theta_e$.<br>$i_d = i_\\alpha \\cos(\\theta_e) + i_\\beta \\sin(\\theta_e)$<br>$i_q = -i_\\alpha \\sin(\\theta_e) + i_\\beta \\cos(\\theta_e)$",
+                pi_d: "<strong>PI Controller (d-axis):</strong> Regulates $i_d$ to $i_{d,ref}$. Output determines $v_{d,ref}$. Typically $i_{d,ref}=0$ for SPMSM.",
+                pi_q: "<strong>PI Controller (q-axis):</strong> Regulates $i_q$ to $i_{q,ref}$. Output determines $v_{q,ref}$. $i_{q,ref}$ is derived from torque command.",
+                inv_park: "<strong>Inverse Park Transform:</strong> Converts desired ($v_{d,ref}, v_{q,ref}$) back to stationary ($v_{\\alpha,ref}, v_{\\beta,ref}$) using $\\theta_e$.<br>$v_{\\alpha,ref} = v_{d,ref} \\cos(\\theta_e) - v_{q,ref} \\sin(\\theta_e)$<br>$v_{\\beta,ref} = v_{d,ref} \\sin(\\theta_e) + v_{q,ref} \\cos(\\theta_e)$",
+                pwm: "<strong>SVPWM/SPWM:</strong> Generates switching signals for the inverter based on $v_{\\alpha,ref}, v_{\\beta,ref}$ to apply voltages to the motor."
+            };
+
+            focBlocks.forEach(block => {
+                block.addEventListener('click', () => {
+                    const detailKey = block.dataset.foc;
+                    focDetailDiv.innerHTML = focDetails[detailKey] || "Details not available.";
+                    renderMathInElement(focDetailDiv); // Re-render KaTeX for dynamic content
+                });
+            });
+            
+            // Chart.js EDF Characteristics
+            const edfCtx = document.getElementById('edfChart').getContext('2d');
+            let edfChartInstance = null;
+            const klInput = document.getElementById('kl_constant');
+            const kpInput = document.getElementById('kp_constant');
+
+            function updateEdfChart() {
+                const kl = parseFloat(klInput.value) || 0.0001;
+                const kp = parseFloat(kpInput.value) || 0.000005;
+                const omegaValues = Array.from({length: 21}, (_, i) => i * 50); // 0 to 1000 rad/s
+                const torqueValues = omegaValues.map(w => kl * w * w);
+                const powerValues = omegaValues.map(w => kp * w * w * w);
+
+                const data = {
+                    labels: omegaValues.map(w => w.toFixed(0)),
+                    datasets: [
+                        {
+                            label: 'Load Torque (TL)',
+                            data: torqueValues,
+                            borderColor: 'rgb(234, 88, 12)', // orange-600
+                            backgroundColor: 'rgba(234, 88, 12, 0.2)',
+                            tension: 0.1,
+                            yAxisID: 'yTorque'
+                        },
+                        {
+                            label: 'Power Consumed (Pedf)',
+                            data: powerValues,
+                            borderColor: 'rgb(22, 163, 74)', // green-600
+                            backgroundColor: 'rgba(22, 163, 74, 0.2)',
+                            tension: 0.1,
+                            yAxisID: 'yPower'
+                        }
+                    ]
+                };
+                const config = {
+                    type: 'line',
+                    data: data,
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        interaction: { mode: 'index', intersect: false },
+                        scales: {
+                            x: { title: { display: true, text: 'Angular Velocity ω (rad/s)'} },
+                            yTorque: {
+                                type: 'linear',
+                                display: true,
+                                position: 'left',
+                                title: { display: true, text: 'Torque TL (Nm)' },
+                                grid: { drawOnChartArea: false }
+                            },
+                            yPower: {
+                                type: 'linear',
+                                display: true,
+                                position: 'right',
+                                title: { display: true, text: 'Power Pedf (W)' },
+                            }
+                        },
+                        plugins: {
+                            tooltip: {
+                                callbacks: {
+                                    label: function(context) {
+                                        let label = context.dataset.label || '';
+                                        if (label) { label += ': '; }
+                                        if (context.parsed.y !== null) {
+                                            label += context.parsed.y.toFixed(2);
+                                        }
+                                        return label;
+                                    }
+                                }
+                            }
+                        }
+                    }
+                };
+                if (edfChartInstance) {
+                    edfChartInstance.destroy();
+                }
+                edfChartInstance = new Chart(edfCtx, config);
+            }
+            klInput.addEventListener('input', updateEdfChart);
+            kpInput.addEventListener('input', updateEdfChart);
+            updateEdfChart();
+
+
+            // Chart.js PI Controller Example
+            const piCtx = document.getElementById('piChart').getContext('2d');
+            const time = Array.from({length: 50}, (_, i) => i * 0.01); // 0 to 0.5s
+            const iq_ref = time.map(t => t < 0.05 ? 0 : 5); // Step input of 5A at t=0.05s
+            const iq_measured = time.map((t,idx) => { // Simple first order response
+                if (t < 0.05) return 0;
+                const tau = 0.05; // Time constant
+                return 5 * (1 - Math.exp(-(t - 0.05) / tau));
+            });
+            
+            new Chart(piCtx, {
+                type: 'line',
+                data: {
+                    labels: time.map(t => t.toFixed(2)),
+                    datasets: [
+                        {
+                            label: 'iq_ref (A)',
+                            data: iq_ref,
+                            borderColor: 'rgb(59, 130, 246)', // blue-500
+                            tension: 0.1,
+                            pointRadius: 0,
+                        },
+                        {
+                            label: 'iq_measured (A)',
+                            data: iq_measured,
+                            borderColor: 'rgb(234, 88, 12)', // orange-600
+                            tension: 0.1,
+                            pointRadius: 0,
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        x: { title: { display: true, text: 'Time (s)'} },
+                        y: { title: { display: true, text: 'Current (A)'} }
+                    },
+                    plugins: {
+                        title: { display: true, text: 'Illustrative PI Controller Response (iq Tracking)' },
+                         tooltip: {
+                            callbacks: {
+                                label: function(context) {
+                                    let label = context.dataset.label || '';
+                                    if (label) { label += ': '; }
+                                    if (context.parsed.y !== null) {
+                                        label += context.parsed.y.toFixed(2);
+                                    }
+                                    return label;
+                                }
+                            }
+                        }
+                    }
+                }
+            });
+
+        });
+    </script>
+</body>
+</html>
